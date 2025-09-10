@@ -14,18 +14,18 @@ block_size = 1024
 bias = False
 real_data = True
 seed = 1337
-device = 'cuda' # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1', etc.
-dtype = 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float16' # 'float32' or 'bfloat16' or 'float16'
+device = torch.device("mps")
+dtype = 'bfloat16'  # 'float32' or 'bfloat16' or 'float16'
 compile = True # use PyTorch 2.0 to compile the model to be faster
 profile = False # use pytorch profiler, or just simple benchmarking?
 exec(open('configurator.py').read()) # overrides from command line or config file
 # -----------------------------------------------------------------------------
 
 torch.manual_seed(seed)
-torch.cuda.manual_seed(seed)
-torch.backends.cuda.matmul.allow_tf32 = True # allow tf32 on matmul
+torch.mps.manual_seed(seed)
+torch.backends.mps.matmul.allow_tf32 = True # allow tf32 on matmul
 torch.backends.cudnn.allow_tf32 = True # allow tf32 on cudnn
-device_type = 'cuda' if 'cuda' in device else 'cpu' # for later use in torch.autocast
+device_type = "mps" if "mps" in device else 'cpu' # for later use in torch.autocast
 ptdtype = {'float32': torch.float32, 'bfloat16': torch.bfloat16, 'float16': torch.float16}[dtype]
 ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
 
@@ -70,7 +70,7 @@ if profile:
     wait, warmup, active = 5, 5, 5
     num_steps = wait + warmup + active
     with torch.profiler.profile(
-        activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+        activities=[torch.profiler.ProfilerActivity.CPU],
         schedule=torch.profiler.schedule(wait=wait, warmup=warmup, active=active, repeat=1),
         on_trace_ready=torch.profiler.tensorboard_trace_handler('./bench_log'),
         record_shapes=False,
@@ -96,7 +96,7 @@ if profile:
 else:
 
     # simple benchmarking
-    torch.cuda.synchronize()
+    torch.mps.synchronize()
     for stage, num_steps in enumerate([10, 20]): # burnin, then benchmark
         t0 = time.time()
         X, Y = get_batch('train')
@@ -109,7 +109,7 @@ else:
             optimizer.step()
             lossf = loss.item()
             print(f"{k}/{num_steps} loss: {lossf:.4f}")
-        torch.cuda.synchronize()
+        torch.mps.synchronize()
         t1 = time.time()
         dt = t1-t0
         mfu = model.estimate_mfu(batch_size * 1 * num_steps, dt)
