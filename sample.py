@@ -106,8 +106,13 @@ with torch.no_grad():
                     probs = generation["iteration_probability_dist"]
                     # all_tokens = generation["all_tokens_so_far"]
 
+                    # Console "streaming" output
                     selected_token = decode(token_y[0].tolist())
                     print(selected_token, end="", flush=True) # Append to console output
+
+                    # Whole string so far
+                    # whole_completion = decode(all_tokens[0].tolist())
+
 
                     # Took wayyy to long to figure out how to get the top 10
                     sorted_probs, indices_probs = torch.sort(probs, descending=True)
