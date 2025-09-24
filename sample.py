@@ -124,6 +124,7 @@ with torch.no_grad():
                     # Show on plot
                     colours = ["green" if t == selected_token else "blue" for t in top_10_tokens]
                     fig, ax = plt.subplots()
+                    fig.set_figwidth(10) # This is set in inches for some reason lol
                     ax.set_ylabel("Probability")
                     ax.bar(top_10_tokens, top_10_probs, color=colours)
                     
