@@ -350,12 +350,14 @@ class GPT(nn.Module):
             probs = F.softmax(logits, dim=-1)
             # sample from the distribution
             idx_next = torch.multinomial(probs, num_samples=1)
+            idx_next_prob = probs[0][idx_next].tolist()[0][0]
 
             # append sampled index to the running sequence and continue
             idx = torch.cat((idx, idx_next), dim=1)
 
             yield {
                 "iteration_token": idx_next,
+                "iteration_token_probability": idx_next_prob,
                 "iteration_probability_dist": probs,
                 "all_tokens_so_far": idx,
             }

@@ -102,17 +102,18 @@ with torch.no_grad():
                 
                 print("\n\nCompletetion including prompt:\n" + start, end="")
                 for generation in generator:
-                    token_y = generation["iteration_token"]
+                    _token_y = generation["iteration_token"]
+                    token_y = _token_y[0].tolist()
+                    token_prob = generation["iteration_token_probability"]
                     probs = generation["iteration_probability_dist"]
                     # all_tokens = generation["all_tokens_so_far"]
 
                     # Console "streaming" output
-                    selected_token = decode(token_y[0].tolist())
+                    selected_token = decode(token_y)
                     print(selected_token, end="", flush=True) # Append to console output
 
                     # Whole string so far
                     # whole_completion = decode(all_tokens[0].tolist())
-
 
                     # Took wayyy to long to figure out how to get the top 10
                     sorted_probs, indices_probs = torch.sort(probs, descending=True)
@@ -123,6 +124,7 @@ with torch.no_grad():
                     # Show on plot
                     colours = ["green" if t == selected_token else "blue" for t in top_10_tokens]
                     fig, ax = plt.subplots()
+                    ax.set_ylabel("Probability")
                     ax.bar(top_10_tokens, top_10_probs, color=colours)
                     
                     # Add button to close and continue
@@ -131,6 +133,10 @@ with torch.no_grad():
                     def clicked_callback(_event):
                         plt.close(fig)
                     next_button.on_clicked(clicked_callback)
+
+                    fig.suptitle('Top 10 tokens and their probabilities')
+                    ax.set_title(f"'{selected_token}' was selected as the next token, from a probability of {token_prob*100:.2f}%")
+
 
                     # Show plot, which pauses execution until it's closed
                     plt.show()
