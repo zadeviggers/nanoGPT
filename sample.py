@@ -10,7 +10,8 @@ import torch
 import tiktoken
 from model import GPTConfig, GPT
 import seaborn as sns
-import matplotlib as plt
+import matplotlib.pyplot as plt
+from matplotlib.widgets import Button
 
 # Apply seaborn default theme
 sns.set_theme()
@@ -103,22 +104,33 @@ with torch.no_grad():
                 for generation in generator:
                     token_y = generation["iteration_token"]
                     probs = generation["iteration_probability_dist"]
+                    # all_tokens = generation["all_tokens_so_far"]
 
-                    token = decode(token_y[0].tolist())
+                    selected_token = decode(token_y[0].tolist())
+                    print(selected_token, end="", flush=True) # Append to console output
 
+                    # Took wayyy to long to figure out how to get the top 10
                     sorted_probs, indices_probs = torch.sort(probs, descending=True)
-                    top_10_probs = sorted_probs[:10]
-                    top_10_indices = indices_probs[:10]
-                    top_10_tokens = [decode(top_10_indices[0].tolist())]
-
-                    print(top_10_tokens)
-                        
-                    # [token, prob, is_generated]
-                    # top_10_probs = [[decode([i]), prob, i == token_y[0][0]] for i, prob in top_10_probs_ys]
-                    # print(top_10_probs)
+                    top_10_probs = sorted_probs[0].tolist()[:10]
+                    top_10_indices = indices_probs[0].tolist()[:10]
+                    top_10_tokens = [decode([t]) for t in top_10_indices]
                     
-                    # plt.pyplot.show() 
-                print("\n\n\nDone.")
+                    # Show on plot
+                    colours = ["green" if t == selected_token else "blue" for t in top_10_tokens]
+                    fig, ax = plt.subplots()
+                    ax.bar(top_10_tokens, top_10_probs, color=colours)
+                    
+                    # Add button to close and continue
+                    button_axis = fig.add_axes([0.7, 0.8, 0.2, 0.075])
+                    next_button = Button(button_axis, "Next token")
+                    def clicked_callback(_event):
+                        plt.close(fig)
+                    next_button.on_clicked(clicked_callback)
+
+                    # Show plot, which pauses execution until it's closed
+                    plt.show()
+
+                print("\nDone.\n")
             else:
                 y = model.generate(x, max_new_tokens, temperature=temperature, top_k=top_k)
                 print(decode(y[0].tolist()))
