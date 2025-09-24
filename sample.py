@@ -106,24 +106,16 @@ with torch.no_grad():
 
                     token = decode(token_y[0].tolist())
 
-                    # Cursed loop to get the top 10 probs & indexes
-                    # [index, prob][]
-                    top_10_probs_ys = [[-1, 0.0] for i in range(10)]
+                    sorted_probs, indices_probs = torch.sort(probs, descending=True)
+                    top_10_probs = sorted_probs[:10]
+                    top_10_indices = indices_probs[:10]
+                    top_10_tokens = [decode(top_10_indices[0].tolist())]
 
-                    for prob, i in enumerate(probs.tolist()):
-                        if prob > 0.0:
-                            print(prob, decode([i]))
-
-                        for j, tprob in top_10_probs_ys:
-                            if prob > tprob:
-                                top_10_probs_ys[j] = [i, prob]
-                                break
-
-                    print(top_10_probs_ys)
+                    print(top_10_tokens)
                         
                     # [token, prob, is_generated]
-                    top_10_probs = [[decode([i]), prob, i == token_y[0][0]] for i, prob in top_10_probs_ys]
-                    print(top_10_probs)
+                    # top_10_probs = [[decode([i]), prob, i == token_y[0][0]] for i, prob in top_10_probs_ys]
+                    # print(top_10_probs)
                     
                     # plt.pyplot.show() 
                 print("\n\n\nDone.")
