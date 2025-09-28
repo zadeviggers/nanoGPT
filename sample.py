@@ -137,7 +137,7 @@ with torch.no_grad():
                     next_button.on_clicked(clicked_callback)
 
                     fig.suptitle('Top 10 tokens and their probabilities')
-                    ax.set_title(f"'{selected_token}' was selected as the next token, from a probability of {token_prob*100:.2f}%")
+                    ax.set_title(f"'{selected_token}' was selected as the next token, from a probability of {token_prob*100:0.2f}%")
 
 
                     # Show plot, which pauses execution until it's closed
@@ -145,6 +145,7 @@ with torch.no_grad():
 
                 print("\nDone.\n")
             else:
-                y = model.generate(x, max_new_tokens, temperature=temperature, top_k=top_k)
+                y, y_prob_cond_prod = model.generate(x, max_new_tokens, temperature=temperature, top_k=top_k)
                 print(decode(y[0].tolist()))
                 print('---------------')
+                print(f"Prob: {y_prob_cond_prod}")

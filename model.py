@@ -14,6 +14,7 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+import numpy as np
 
 class LayerNorm(nn.Module):
     """ LayerNorm but with an optional bias. PyTorch doesn't support simply bias=False """
@@ -308,7 +309,9 @@ class GPT(nn.Module):
         Take a conditioning sequence of indices idx (LongTensor of shape (b,t)) and complete
         the sequence max_new_tokens times, feeding the predictions back into the model each time.
         Most likely you'll want to make sure to be in model.eval() mode of operation for this.
+        Returns a tuple of (response, response_probability)
         """
+        corpus_log_prob = 0.0
         for _ in range(max_new_tokens):
             # if the sequence context is growing too long we must crop it at block_size
             idx_cond = idx if idx.size(1) <= self.config.block_size else idx[:, -self.config.block_size:]
@@ -324,10 +327,19 @@ class GPT(nn.Module):
             probs = F.softmax(logits, dim=-1)
             # sample from the distribution
             idx_next = torch.multinomial(probs, num_samples=1)
+            idx_next_prob = probs[0][idx_next].tolist()[0][0]
+
             # append sampled index to the running sequence and continue
             idx = torch.cat((idx, idx_next), dim=1)
+            
+            idx_next_log_prob = np.log(idx_next_prob)
+            corpus_log_prob += idx_next_log_prob
 
-        return idx
+            print(f"This log prob: {idx_next_log_prob:0.5f} Corpus log prob: {corpus_log_prob:0.5f}")
+
+
+
+        return idx, np.exp(corpus_log_prob)
     
     @torch.no_grad()
     def generate_generator(self, idx, max_new_tokens, temperature=1.0, top_k=None):

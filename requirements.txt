@@ -1,3 +1,6 @@
 torch
 matplotlib
 seaborn
+tiktoken
+transformers
+numpy
