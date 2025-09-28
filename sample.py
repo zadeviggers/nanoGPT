@@ -12,6 +12,7 @@ from model import GPTConfig, GPT
 import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
+import numpy as np
 
 # Apply seaborn default theme
 sns.set_theme()
