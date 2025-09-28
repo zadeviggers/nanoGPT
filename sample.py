@@ -30,6 +30,7 @@ device = torch.device("mps") # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1', etc.
 dtype = 'float32' # 'bfloat16' or 'float16'
 show_probs = False # Set to True to see chart of top 10 tokens each iteration
 compile = True # use PyTorch 2.0 to compile the model to be faster
+fixed_response = "" # Use a fixed completion instead of sampling stochastically
 exec(open('configurator.py').read()) # overrides from command line or config file
 # -----------------------------------------------------------------------------
 
@@ -90,8 +91,13 @@ if start.startswith('FILE:'):
 
 # Make newlines work
 start = start.replace("\\n", "\n")
+fixed_response = fixed_response.replace("\\n", "\n")
 
 start_ids = encode(start)
+fixed_response_ids = None
+if len(fixed_response) > 0:
+    fixed_response_ids = encode(fixed_response)
+
 x = (torch.tensor(start_ids, dtype=torch.long, device=device)[None, ...])
 
 # run generation
@@ -99,7 +105,7 @@ with torch.no_grad():
     with ctx:
         for k in range(num_samples):
             if show_probs:
-                generator = model.generate_generator(x, max_new_tokens, temperature=temperature, top_k=top_k)
+                generator = model.generate_generator(x, max_new_tokens, temperature=temperature, top_k=top_k, fixed_response=fixed_response_ids)
                 
                 print("\n\nCompletetion including prompt:\n" + start, end="")
                 for generation in generator:
@@ -145,7 +151,7 @@ with torch.no_grad():
 
                 print("\nDone.\n")
             else:
-                y, y_prob_cond_prod = model.generate(x, max_new_tokens, temperature=temperature, top_k=top_k)
+                y, y_prob_cond_prod = model.generate(x, max_new_tokens, temperature=temperature, top_k=top_k, fixed_response=fixed_response_ids)
                 print(decode(y[0].tolist()))
                 print('---------------')
-                print(f"Prob: {y_prob_cond_prod}")
+                print(f"Prob: {y_prob_cond_prod*100:0.10f}%")

@@ -304,15 +304,27 @@ class GPT(nn.Module):
         return mfu
 
     @torch.no_grad()
-    def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None):
+    def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None, fixed_response=None):
         """
         Take a conditioning sequence of indices idx (LongTensor of shape (b,t)) and complete
         the sequence max_new_tokens times, feeding the predictions back into the model each time.
         Most likely you'll want to make sure to be in model.eval() mode of operation for this.
         Returns a tuple of (response, response_probability)
+
+        A fixed sequence of tokens can be provided. These tokens will be used before new tokens
+        are sampled. Their probability will still contribute to the compleiton probability returned.
         """
+
+        max_completion_tokens = max_new_tokens
+        if fixed_response is not None:
+            max_completion_tokens = max(max_completion_tokens, len(fixed_response))
+
         corpus_log_prob = 0.0
-        for _ in range(max_new_tokens):
+        for i in range(max_completion_tokens):
+            fixed_token_generation = None
+            if fixed_response is not None and i < len(fixed_response):
+                fixed_token_generation = fixed_response[i]
+
             # if the sequence context is growing too long we must crop it at block_size
             idx_cond = idx if idx.size(1) <= self.config.block_size else idx[:, -self.config.block_size:]
             # forward the model to get the logits for the index in the sequence
@@ -325,19 +337,29 @@ class GPT(nn.Module):
                 logits[logits < v[:, [-1]]] = -float('Inf')
             # apply softmax to convert logits to (normalized) probabilities
             probs = F.softmax(logits, dim=-1)
-            # sample from the distribution
-            idx_next = torch.multinomial(probs, num_samples=1)
-            idx_next_prob = probs[0][idx_next].tolist()[0][0]
+
+            # sample from the distribution or use preset token
+            idx_next = None
+            idx_next_prob = None
+            print(probs)
+            if fixed_token_generation is not None:
+                # The fact I need to do this is so dumb
+                idx_next = torch.tensor([[fixed_token_generation]], device=idx.device)
+                idx_next_prob = probs[0][idx_next].tolist()[0][0]
+            else:
+                idx_next = torch.multinomial(probs, num_samples=1)
+                print(idx_next)
+                idx_next_prob = probs[0][idx_next].tolist()[0][0]
+            
+            print(idx_next_prob)
 
             # append sampled index to the running sequence and continue
             idx = torch.cat((idx, idx_next), dim=1)
-            
+
             idx_next_log_prob = np.log(idx_next_prob)
             corpus_log_prob += idx_next_log_prob
 
             print(f"This log prob: {idx_next_log_prob:0.5f} Corpus log prob: {corpus_log_prob:0.5f}")
-
-
 
         return idx, np.exp(corpus_log_prob)
     
