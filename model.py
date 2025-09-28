@@ -341,18 +341,14 @@ class GPT(nn.Module):
             # sample from the distribution or use preset token
             idx_next = None
             idx_next_prob = None
-            print(probs)
             if fixed_token_generation is not None:
                 # The fact I need to do this is so dumb
                 idx_next = torch.tensor([[fixed_token_generation]], device=idx.device)
-                idx_next_prob = probs[0][idx_next].tolist()[0][0]
             else:
                 idx_next = torch.multinomial(probs, num_samples=1)
-                print(idx_next)
-                idx_next_prob = probs[0][idx_next].tolist()[0][0]
-            
-            print(idx_next_prob)
 
+            idx_next_prob = probs[0][idx_next].tolist()[0][0]
+        
             # append sampled index to the running sequence and continue
             idx = torch.cat((idx, idx_next), dim=1)
 
@@ -364,12 +360,22 @@ class GPT(nn.Module):
         return idx, np.exp(corpus_log_prob)
     
     @torch.no_grad()
-    def generate_generator(self, idx, max_new_tokens, temperature=1.0, top_k=None):
+    def generate_generator(self, idx, max_new_tokens, temperature=1.0, top_k=None, fixed_response=None):
         """
         Based on model.generate(), but yeilds each token before generating the next.
         Also returns probability distribution as well as selected token.
         """
-        for _ in range(max_new_tokens):
+        max_completion_tokens = max_new_tokens
+        if fixed_response is not None:
+            max_completion_tokens = max(max_completion_tokens, len(fixed_response))
+
+
+        for i in range(max_completion_tokens):
+            fixed_token_generation = None
+            if fixed_response is not None and i < len(fixed_response):
+                fixed_token_generation = fixed_response[i]
+
+
             # if the sequence context is growing too long we must crop it at block_size
             idx_cond = idx if idx.size(1) <= self.config.block_size else idx[:, -self.config.block_size:]
             # forward the model to get the logits for the index in the sequence
@@ -382,8 +388,16 @@ class GPT(nn.Module):
                 logits[logits < v[:, [-1]]] = -float('Inf')
             # apply softmax to convert logits to (normalized) probabilities
             probs = F.softmax(logits, dim=-1)
-            # sample from the distribution
-            idx_next = torch.multinomial(probs, num_samples=1)
+            
+            # sample from the distribution or use preset token
+            idx_next = None
+            idx_next_prob = None
+            if fixed_token_generation is not None:
+                # The fact I need to do this is so dumb
+                idx_next = torch.tensor([[fixed_token_generation]], device=idx.device)
+            else:
+                idx_next = torch.multinomial(probs, num_samples=1)
+
             idx_next_prob = probs[0][idx_next].tolist()[0][0]
 
             # append sampled index to the running sequence and continue
