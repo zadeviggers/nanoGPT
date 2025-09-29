@@ -154,4 +154,4 @@ with torch.no_grad():
                 y, y_prob_cond_prod = model.generate(x, max_new_tokens, temperature=temperature, top_k=top_k, fixed_response=fixed_response_ids)
                 print(decode(y[0].tolist()))
                 print('---------------')
-                print(f"Prob: {y_prob_cond_prod*100:0.10f}%")
+                print(f"Prob: {str(y_prob_cond_prod)}")
