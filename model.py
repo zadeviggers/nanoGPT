@@ -355,7 +355,7 @@ class GPT(nn.Module):
             idx_next_log_prob = np.log(idx_next_prob)
             corpus_log_prob += idx_next_log_prob
 
-            print(f"This log prob: {idx_next_log_prob:0.5f} Corpus log prob: {corpus_log_prob:0.5f}")
+            # print(f"This log prob: {idx_next_log_prob:0.5f} Corpus log prob: {corpus_log_prob:0.5f}")
 
         return idx, np.exp(corpus_log_prob)
     
