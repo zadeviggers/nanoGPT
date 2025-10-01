@@ -92,6 +92,7 @@ def eval(eval_data_file: str):
         # run generation
         with torch.no_grad():
             with ctx:
+                i = 1
                 for test in tests:
                     question = test["prompt"]
                     response = test["response"]
@@ -105,7 +106,8 @@ def eval(eval_data_file: str):
 
                     y, y_prob_cond_prod = model.generate(x, max_new_tokens, temperature=temperature, top_k=top_k, fixed_response=fixed_response_ids)
 
-                    print(f"{chalk.cyan.bold(str(y_prob_cond_prod))}: {decode(y[0].tolist())}")
+                    print(f"{i}: {chalk.cyan.bold(str(y_prob_cond_prod))}: {decode(y[0].tolist())}")
+                    i += 1
 
 
 # Only run automatically if it was called directly, not if it was imported
