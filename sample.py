@@ -10,7 +10,7 @@ import torch
 import tiktoken
 from model import GPTConfig, GPT
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Button, RadioButtons
+from matplotlib.widgets import Button, RadioButtons, Slider
 import numpy as np
 
 # -----------------------------------------------------------------------------
@@ -123,7 +123,8 @@ with torch.no_grad():
                     if show_attention:
                         print(model.last_token_attention_weights[-1].shape)
                         n_blocks = len(model.last_token_attention_weights)
-                        n_heads = len(model.last_token_attention_weights[0])
+                        n_heads = len(model.last_token_attention_weights[0][0, :, -1, :])
+                        # print("BLocks",n_blocks,"Heads",n_heads)
 
                         # Changed in the chart
                         block_mode = "Mean"
@@ -135,6 +136,8 @@ with torch.no_grad():
                             block = model.last_token_attention_weights[block_i]
                             last_token_attention = block[0, :, -1, :]
                             # Shape is now (num_heads, sequence_length)
+
+                            # print(last_token_attention.shape)
 
                             if head is None:
                                 total_weights = [0 for _ in range(n_tokens)]
@@ -183,7 +186,7 @@ with torch.no_grad():
                         # Hide 'blank' sections
                         ax["blank"].axis("off")
                         main = ax["main"]
-                        fig.set_figwidth(10) # This is set in inches for some reason lol
+                        fig.set_figwidth(12) # This is set in inches for some reason lol
                         fig.set_figheight(8) 
                         main.set_ylabel("Average attention weight in all blocks")
 
@@ -228,6 +231,32 @@ with torch.no_grad():
                         head_radio.on_clicked(head_radio_fn)
 
                         # Sliders for selecting head or block
+                        head_slider = Slider(
+                            ax["head_slider"],
+                            label="Head to show weights for",
+                            valinit=head_n,
+                            valstep=[i for i in range(n_heads)],
+                            valmin=0,
+                            valmax=n_heads-1
+                        )
+                        block_slider = Slider(
+                            ax["block_slider"],
+                            label="Block to show weights for",
+                            valinit=block_n,
+                            valstep=[i for i in range(n_blocks)],
+                            valmin=0,
+                            valmax=n_blocks-1
+                        )
+                        def on_slider_change(val):
+                            block_n = block_slider.val
+                            head_n = head_slider.val
+                            update_bar_chart(get_block_attention_weights())
+                            update_labels()
+                            fig.canvas.draw()
+
+                        head_slider.on_changed(on_slider_change)
+                        block_slider.on_changed(on_slider_change)
+
 
 
                         # Add button to close and continue
