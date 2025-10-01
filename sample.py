@@ -149,7 +149,7 @@ with torch.no_grad():
                                         total_weights[j] += float(token_weight)
                                 return [total / n_heads for total in total_weights]
 
-                            return last_token_attention[head]
+                            return [float(token_weight) for token_weight in last_token_attention[head]]
 
                         def get_block_attention_weights(block=None, head=None):
                             # Update vars, whilst keeping it usable as an indepent func
