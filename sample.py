@@ -172,9 +172,9 @@ with torch.no_grad():
                         # Fancy named grid area layout
                         fig, ax = plt.subplot_mosaic(
                             [
-                                ['main', 'main'],
-                                ['block_radio', 'head_radio'],
-                                ['block_slider', 'head_slider'],
+                                ['main', 'main', "main"],
+                                ['block_radio', 'head_radio', "controls"],
+                                ['block_slider', 'head_slider', "controls"],
                             ],
                             height_ratios=[7, 1, 1],
                             layout='constrained',
@@ -205,6 +205,8 @@ with torch.no_grad():
                                 else:
                                     main.set_ylabel(f"Head {head_n} attention weight in {block_name}")
 
+                        # Radio buttons for average vs slider
+                        ax['block_radio'].set_title("Block mode")
                         block_radio = RadioButtons(ax['block_radio'], ('Mean', 'Individual'))
                         def block_radio_fn(label):
                             block_mode = label
@@ -213,6 +215,7 @@ with torch.no_grad():
                             fig.canvas.draw()
                         block_radio.on_clicked(block_radio_fn)
 
+                        ax['head_radio'].set_title("Head mode")
                         head_radio = RadioButtons(ax['head_radio'], ('Mean', 'Individual'))
                         def head_radio_fn(label):
                             head_mode = label
@@ -221,10 +224,11 @@ with torch.no_grad():
                             fig.canvas.draw()
                         head_radio.on_clicked(head_radio_fn)
 
+                        # Sliders for selecting head or block
+
 
                         # Add button to close and continue
-                        button_axis = fig.add_axes([0.7, 0.8, 0.2, 0.075])
-                        next_button = Button(button_axis, "Next token")
+                        next_button = Button(ax["controls"], "Next token >>")
                         def clicked_callback(_event):
                             plt.close(fig)
                         next_button.on_clicked(clicked_callback)
