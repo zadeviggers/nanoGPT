@@ -173,12 +173,15 @@ with torch.no_grad():
                         fig, ax = plt.subplot_mosaic(
                             [
                                 ['main', 'main', "main"],
-                                ['block_radio', 'head_radio', "controls"],
+                                ['block_radio', 'head_radio', "blank"],
                                 ['block_slider', 'head_slider', "controls"],
                             ],
                             height_ratios=[7, 1, 1],
+                            width_ratios=[2, 2, 1],
                             layout='constrained',
                         )
+                        # Hide 'blank' sections
+                        ax["blank"].axis("off")
                         main = ax["main"]
                         fig.set_figwidth(10) # This is set in inches for some reason lol
                         fig.set_figheight(8) 
