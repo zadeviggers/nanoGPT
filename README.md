@@ -1,7 +1,7 @@
 # AIML332 Assignment 2
 ## Zade Viggers 300655355
 
-This version of nanoGPT has had several things added to it. Examples can be found in the report.pdf file.
+This version of nanoGPT has had several things added to it. Examples can be found in the [AIML320 Assignment 2 report.pdf](./AIML320%20Assignment%202%20report.pdf) file.
 
 Note that this version of nanoGPT has also been adapted to run on Apple Silicon GPUs, and may no longer run on CUDA platforms. It will likely also require some adaption to run on CPU on non-Apple platforms.
 
