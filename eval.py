@@ -93,8 +93,10 @@ def eval(eval_data_file: str):
         with torch.no_grad():
             with ctx:
                 for test in tests:
-                    prompt = test["prompt"]
+                    question = test["prompt"]
                     response = test["response"]
+
+                    prompt = f"Question: {question}\nAnswer: "
 
                     start_ids = encode(prompt)
                     fixed_response_ids = encode(response)
