@@ -331,12 +331,19 @@ class GPT(nn.Module):
             logits, _ = self(idx_cond)
             # pluck the logits at the final step and scale by desired temperature
             logits = logits[:, -1, :] / temperature
-            # optionally crop the logits to only the top k options
+
+            # get copy for probs
+            logits_full = logits.clone()
+
+            # optionally crop the logits to only the top k options, for sampling only
             if top_k is not None:
                 v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
                 logits[logits < v[:, [-1]]] = -float('Inf')
             # apply softmax to convert logits to (normalized) probabilities
-            probs = F.softmax(logits, dim=-1)
+            probs_sampling = F.softmax(logits, dim=-1)
+
+            # stable log probs to avoid divide by zero problems
+            probs_log = torch.log_softmax(logits_full, dim=-1)
 
             # sample from the distribution or use preset token
             idx_next = None
@@ -345,14 +352,12 @@ class GPT(nn.Module):
                 # The fact I need to do this is so dumb
                 idx_next = torch.tensor([[fixed_token_generation]], device=idx.device)
             else:
-                idx_next = torch.multinomial(probs, num_samples=1)
-
-            idx_next_prob = probs[0][idx_next].tolist()[0][0]
+                idx_next = torch.multinomial(probs_sampling, num_samples=1)
         
             # append sampled index to the running sequence and continue
             idx = torch.cat((idx, idx_next), dim=1)
 
-            idx_next_log_prob = np.log(idx_next_prob)
+            idx_next_log_prob = probs_log[0][idx_next].tolist()[0][0]
             corpus_log_prob += idx_next_log_prob
 
             # print(f"This log prob: {idx_next_log_prob:0.5f} Corpus log prob: {corpus_log_prob:0.5f}")

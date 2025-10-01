@@ -103,7 +103,7 @@ def eval(eval_data_file: str):
 
                     y, y_prob_cond_prod = model.generate(x, max_new_tokens, temperature=temperature, top_k=top_k, fixed_response=fixed_response_ids)
 
-                    print(f"{chalk.cyan.bold(str(y_prob_cond_prod*100))}{chalk.cyan("%")}: {decode(y[0].tolist())}")
+                    print(f"{chalk.cyan.bold(str(y_prob_cond_prod))}: {decode(y[0].tolist())}")
 
 
 # Only run automatically if it was called directly, not if it was imported
