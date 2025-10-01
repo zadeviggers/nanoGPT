@@ -43,7 +43,9 @@ class CausalSelfAttention(nn.Module):
         self.n_embd = config.n_embd
         self.dropout = config.dropout
         # flash attention make GPU go brrrrr but support is only in PyTorch >= 2.0
-        self.flash = hasattr(torch.nn.functional, 'scaled_dot_product_attention')
+        self.flash = config.flash
+        if config.flash:
+            self.flash = hasattr(torch.nn.functional, 'scaled_dot_product_attention')
         if not self.flash:
             print("WARNING: using slow attention. Flash Attention requires PyTorch >= 2.0")
             # causal mask to ensure that attention is only applied to the left in the input sequence
@@ -59,6 +61,8 @@ class CausalSelfAttention(nn.Module):
         q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
 
+        attention_weights = None
+
         # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         if self.flash:
             # efficient attention using Flash Attention CUDA kernels
@@ -68,13 +72,14 @@ class CausalSelfAttention(nn.Module):
             att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
             att = att.masked_fill(self.bias[:,:,:T,:T] == 0, float('-inf'))
             att = F.softmax(att, dim=-1)
+            attention_weights = att
             att = self.attn_dropout(att)
             y = att @ v # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
         y = y.transpose(1, 2).contiguous().view(B, T, C) # re-assemble all head outputs side by side
 
         # output projection
         y = self.resid_dropout(self.c_proj(y))
-        return y
+        return y, attention_weights
 
 class MLP(nn.Module):
 
@@ -102,9 +107,10 @@ class Block(nn.Module):
         self.mlp = MLP(config)
 
     def forward(self, x):
-        x = x + self.attn(self.ln_1(x))
+        attention_y, attention_weights = self.attn(self.ln_1(x))
+        x = x + attention_y
         x = x + self.mlp(self.ln_2(x))
-        return x
+        return x, attention_weights
 
 @dataclass
 class GPTConfig:
@@ -115,8 +121,10 @@ class GPTConfig:
     n_embd: int = 768
     dropout: float = 0.0
     bias: bool = True # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    flash: bool = True
 
 class GPT(nn.Module):
+    last_token_attention_weights = []
 
     def __init__(self, config):
         super().__init__()
@@ -178,8 +186,11 @@ class GPT(nn.Module):
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         pos_emb = self.transformer.wpe(pos) # position embeddings of shape (t, n_embd)
         x = self.transformer.drop(tok_emb + pos_emb)
+
+        self.last_token_attention_weights = []
         for block in self.transformer.h:
-            x = block(x)
+            x, attention_weights = block(x)
+            self.last_token_attention_weights.append(attention_weights)
         x = self.transformer.ln_f(x)
 
         if targets is not None:
@@ -209,7 +220,7 @@ class GPT(nn.Module):
         assert model_type in {'gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl'}
         override_args = override_args or {} # default to empty dict
         # only dropout can be overridden see more notes below
-        assert all(k == 'dropout' for k in override_args)
+        assert all((k == 'dropout' or k == "flash") for k in override_args)
         from transformers import GPT2LMHeadModel
         print("loading weights from pretrained gpt: %s" % model_type)
 
@@ -228,6 +239,8 @@ class GPT(nn.Module):
         if 'dropout' in override_args:
             print(f"overriding dropout rate to {override_args['dropout']}")
             config_args['dropout'] = override_args['dropout']
+        if 'flash' in override_args:
+            config_args['flash'] = override_args['flash']
         # create a from-scratch initialized minGPT model
         config = GPTConfig(**config_args)
         model = GPT(config)
@@ -376,6 +389,8 @@ class GPT(nn.Module):
 
 
         for i in range(max_completion_tokens):
+            prev_idx = idx
+
             fixed_token_generation = None
             if fixed_response is not None and i < len(fixed_response):
                 fixed_token_generation = fixed_response[i]
@@ -405,6 +420,7 @@ class GPT(nn.Module):
 
             idx_next_prob = probs[0][idx_next].tolist()[0][0]
 
+
             # append sampled index to the running sequence and continue
             idx = torch.cat((idx, idx_next), dim=1)
 
@@ -413,6 +429,7 @@ class GPT(nn.Module):
                 "iteration_token_probability": idx_next_prob,
                 "iteration_probability_dist": probs,
                 "all_tokens_so_far": idx,
+                "all_previous_tokens": prev_idx,
             }
 
         return idx

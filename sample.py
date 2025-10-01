@@ -25,6 +25,7 @@ seed = 42069
 device = torch.device("mps") # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1', etc.
 dtype = 'float32' # 'bfloat16' or 'float16'
 show_probs = False # Set to True to see chart of top 10 tokens each iteration
+show_attention = False # Set to True to diagram of which tokens the attention mechanism is focusing on
 compile = True # use PyTorch 2.0 to compile the model to be faster
 fixed_response = "" # Use a fixed completion instead of sampling stochastically
 exec(open('configurator.py').read()) # overrides from command line or config file
@@ -53,7 +54,8 @@ if init_from == 'resume':
     model.load_state_dict(state_dict)
 elif init_from.startswith('gpt2'):
     # init from a given GPT-2 model
-    model = GPT.from_pretrained(init_from, dict(dropout=0.0))
+    # Also disable flash attention if we want to visualise it
+    model = GPT.from_pretrained(init_from, dict(dropout=0.0, flash=(not show_attention)))
 
 model.eval()
 model.to(device)
@@ -100,7 +102,7 @@ x = (torch.tensor(start_ids, dtype=torch.long, device=device)[None, ...])
 with torch.no_grad():
     with ctx:
         for k in range(num_samples):
-            if show_probs:
+            if show_probs or show_attention:
                 generator = model.generate_generator(x, max_new_tokens, temperature=temperature, top_k=top_k, fixed_response=fixed_response_ids)
                 
                 print("\n\nCompletetion including prompt:\n" + start, end="")
@@ -109,41 +111,79 @@ with torch.no_grad():
                     token_y = _token_y[0].tolist()
                     token_prob = generation["iteration_token_probability"]
                     probs = generation["iteration_probability_dist"]
-                    # all_tokens = generation["all_tokens_so_far"]
+                    all_prev_tokens = generation["all_previous_tokens"]
 
                     # Console "streaming" output
                     selected_token = decode(token_y)
                     print(selected_token, end="", flush=True) # Append to console output
 
                     # Whole string so far
-                    # whole_completion = decode(all_tokens[0].tolist())
+                    whole_prev_completion = [decode([t]) for t in all_prev_tokens[0].tolist()]
 
-                    # Took wayyy to long to figure out how to get the top 10
-                    sorted_probs, indices_probs = torch.sort(probs, descending=True)
-                    top_10_probs = sorted_probs[0].tolist()[:10]
-                    top_10_indices = indices_probs[0].tolist()[:10]
-                    top_10_tokens = [decode([t]) for t in top_10_indices]
-                    
-                    # Show on plot
-                    colours = ["green" if t == selected_token else "blue" for t in top_10_tokens]
-                    fig, ax = plt.subplots()
-                    fig.set_figwidth(10) # This is set in inches for some reason lol
-                    ax.set_ylabel("Probability")
-                    ax.bar(top_10_tokens, top_10_probs, color=colours)
-                    
-                    # Add button to close and continue
-                    button_axis = fig.add_axes([0.7, 0.8, 0.2, 0.075])
-                    next_button = Button(button_axis, "Next token")
-                    def clicked_callback(_event):
-                        plt.close(fig)
-                    next_button.on_clicked(clicked_callback)
+                    if show_attention:
+                        print(model.last_token_attention_weights[-1].shape)
 
-                    fig.suptitle('Top 10 tokens and their probabilities')
-                    ax.set_title(f"'{selected_token}' was selected as the next token, from a probability of {token_prob*100:0.2f}%")
+                        last_attention_weights = model.last_token_attention_weights[-1]
+                        last_token_attention = last_attention_weights[0, :, -1, :]
+                        # Shape is now (num_heads, sequence_length)
+
+                        token_total_attention_weights = [0 for _ in range(len(whole_prev_completion))]
+                        for i, head in enumerate(last_token_attention):
+                            for j, (attention_weight, token) in enumerate(zip(head, whole_prev_completion)):
+                                token_total_attention_weights[j] += float(attention_weight)
+                                # print(f"Head {i} | {token}: {attention_weight}")
+                        
+                        mean_attention_weights = [total / len(last_token_attention) for total in token_total_attention_weights]
+
+                        # for token, mean_attention_weight in zip(whole_prev_completion, mean_attention_weights):
+                        #     print(f"{mean_attention_weight}: {token}")
+                        
+                        fig, ax = plt.subplots()
+                        fig.set_figwidth(10) # This is set in inches for some reason lol
+                        ax.set_ylabel("Average attention weight in block")
+                        ax.bar(whole_prev_completion, mean_attention_weights)
+
+                        fig.suptitle('Mean attention weight')
+                        ax.set_title(f"'{selected_token}' was selected as the next token, from a probability of {token_prob*100:0.2f}%")
+
+                        # Add button to close and continue
+                        button_axis = fig.add_axes([0.7, 0.8, 0.2, 0.075])
+                        next_button = Button(button_axis, "Next token")
+                        def clicked_callback(_event):
+                            plt.close(fig)
+                        next_button.on_clicked(clicked_callback)
+
+                        # Show plot, which pauses execution until it's closed
+                        plt.show()
 
 
-                    # Show plot, which pauses execution until it's closed
-                    plt.show()
+                    if show_probs:
+                        # Took wayyy to long to figure out how to get the top 10
+                        sorted_probs, indices_probs = torch.sort(probs, descending=True)
+                        top_10_probs = sorted_probs[0].tolist()[:10]
+                        top_10_indices = indices_probs[0].tolist()[:10]
+                        top_10_tokens = [decode([t]) for t in top_10_indices]
+                        
+                        # Show on plot
+                        colours = ["green" if t == selected_token else "blue" for t in top_10_tokens]
+                        fig, ax = plt.subplots()
+                        fig.set_figwidth(10) # This is set in inches for some reason lol
+                        ax.set_ylabel("Probability")
+                        ax.bar(top_10_tokens, top_10_probs, color=colours)
+                        
+                        # Add button to close and continue
+                        button_axis = fig.add_axes([0.7, 0.8, 0.2, 0.075])
+                        next_button = Button(button_axis, "Next token")
+                        def clicked_callback(_event):
+                            plt.close(fig)
+                        next_button.on_clicked(clicked_callback)
+
+                        fig.suptitle('Top 10 tokens and their probabilities')
+                        ax.set_title(f"'{selected_token}' was selected as the next token, from a probability of {token_prob*100:0.2f}%")
+
+
+                        # Show plot, which pauses execution until it's closed
+                        plt.show()
 
                 print("\nDone.\n")
             else:
