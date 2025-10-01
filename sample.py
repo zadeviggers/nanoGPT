@@ -215,7 +215,7 @@ with torch.no_grad():
 
                         # Radio buttons for average vs slider
                         ax['block_radio'].set_title("Block mode")
-                        block_radio = RadioButtons(ax['block_radio'], ('Mean', 'Individual'))
+                        block_radio = RadioButtons(ax['block_radio'], ('Mean', 'Individual'), active=1)
                         def block_radio_fn(label):
                             chart_state["block_mode"] = label
                             update_bar_chart(get_block_attention_weights())
