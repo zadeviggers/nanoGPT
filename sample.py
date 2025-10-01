@@ -119,6 +119,7 @@ with torch.no_grad():
 
                     # Whole string so far
                     whole_prev_completion = [decode([t]) for t in all_prev_tokens[0].tolist()]
+
                     n_tokens = len(whole_prev_completion)
                     if show_attention:
                         # print(model.last_token_attention_weights[-1].shape)
@@ -188,6 +189,7 @@ with torch.no_grad():
                         # Hide 'blank' sections
                         ax["blank"].axis("off")
                         main = ax["main"]
+                        main.set_xlim(0, 100)
                         fig.set_figwidth(12) # This is set in inches for some reason lol
                         fig.set_figheight(8) 
                         main.set_ylabel("Average attention weight in all blocks")
@@ -195,12 +197,15 @@ with torch.no_grad():
 
                         def update_bar_chart(data):
                             main.clear()
-                            main.bar(whole_prev_completion, get_block_attention_weights())
+                            fresh_weights = get_block_attention_weights()
+                            # THis is soooo dumb. Matplotlib silently drops columns with duplicate names unless
+                            # you do this weird constructor format
+                            main.bar(range(len(fresh_weights)), fresh_weights, tick_label=whole_prev_completion)
                        
                         def update_labels():
                             fig.suptitle('Attention weights')
                             main.set_title(f"'{selected_token}' was selected as the next token, from a probability of {token_prob*100:0.2f}%")
-
+                    
                             if chart_state["block_mode"] == "Mean":
                                 if chart_state["head_mode"] == "Mean":
                                     main.set_ylabel("Average head attention weight across all blocks")
@@ -274,6 +279,8 @@ with torch.no_grad():
 
                         # Show plot, which pauses execution until it's closed
                         plt.show()
+
+                        plt.close(fig)
 
 
                     if show_probs:
