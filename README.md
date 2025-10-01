@@ -5,6 +5,12 @@ This version of nanoGPT has had several things added to it. Examples can be foun
 
 Note that this version of nanoGPT has also been adapted to run on Apple Silicon GPUs, and may no longer run on CUDA platforms. It will likely also require some adaption to run on CPU on non-Apple platforms.
 
+
+Setup:
+```sh
+pip install -r requirements.txt
+```
+
 Below is the regular nanoGPT README file.
 
 
