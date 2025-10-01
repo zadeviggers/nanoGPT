@@ -10,7 +10,7 @@ import torch
 import tiktoken
 from model import GPTConfig, GPT
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Button
+from matplotlib.widgets import Button, RadioButtons
 import numpy as np
 
 # -----------------------------------------------------------------------------
@@ -119,32 +119,108 @@ with torch.no_grad():
 
                     # Whole string so far
                     whole_prev_completion = [decode([t]) for t in all_prev_tokens[0].tolist()]
-
+                    n_tokens = len(whole_prev_completion)
                     if show_attention:
                         print(model.last_token_attention_weights[-1].shape)
+                        n_blocks = len(model.last_token_attention_weights)
+                        n_heads = len(model.last_token_attention_weights[0])
 
-                        last_attention_weights = model.last_token_attention_weights[-1]
-                        last_token_attention = last_attention_weights[0, :, -1, :]
-                        # Shape is now (num_heads, sequence_length)
+                        # Changed in the chart
+                        block_mode = "Mean"
+                        head_mode = "Mean"
+                        block_n = n_blocks - 1
+                        head_n = n_heads - 1
 
-                        token_total_attention_weights = [0 for _ in range(len(whole_prev_completion))]
-                        for i, head in enumerate(last_token_attention):
-                            for j, (attention_weight, token) in enumerate(zip(head, whole_prev_completion)):
-                                token_total_attention_weights[j] += float(attention_weight)
-                                # print(f"Head {i} | {token}: {attention_weight}")
-                        
-                        mean_attention_weights = [total / len(last_token_attention) for total in token_total_attention_weights]
+                        def get_head_attention_weights(block_i, head=None):
+                            block = model.last_token_attention_weights[block_i]
+                            last_token_attention = block[0, :, -1, :]
+                            # Shape is now (num_heads, sequence_length)
 
-                        # for token, mean_attention_weight in zip(whole_prev_completion, mean_attention_weights):
-                        #     print(f"{mean_attention_weight}: {token}")
-                        
-                        fig, ax = plt.subplots()
+                            if head is None:
+                                total_weights = [0 for _ in range(n_tokens)]
+                                for i in range(n_heads):
+                                    for j, token_weight in enumerate(last_token_attention[i]):
+                                        # Convert from tensor to float
+                                        total_weights[j] += float(token_weight)
+                                return [total / n_heads for total in total_weights]
+
+                            return last_token_attention[head]
+
+                        def get_block_attention_weights(block=None, head=None):
+                            # Update vars, whilst keeping it usable as an indepent func
+                            if block is None:
+                                if block_mode == "Mean":
+                                    pass
+                                else:
+                                    block = block_n
+                            
+                            if head is None:
+                                if head_mode == "Mean":
+                                    pass
+                                else:
+                                    head = head_n
+                                
+                            if block is None:
+                                total_weights = [0 for _ in range(n_tokens)]
+                                for i in range(n_blocks):
+                                    for j, token_avg_weight in enumerate(get_head_attention_weights(i, head)):
+                                        total_weights[j] += token_avg_weight
+                                return [total / n_blocks for total in total_weights]
+
+                            return get_head_attention_weights(block, head)
+
+                        # Fancy named grid area layout
+                        fig, ax = plt.subplot_mosaic(
+                            [
+                                ['main', 'main'],
+                                ['block_radio', 'head_radio'],
+                                ['block_slider', 'head_slider'],
+                            ],
+                            height_ratios=[7, 1, 1],
+                            layout='constrained',
+                        )
+                        main = ax["main"]
                         fig.set_figwidth(10) # This is set in inches for some reason lol
-                        ax.set_ylabel("Average attention weight in block")
-                        ax.bar(whole_prev_completion, mean_attention_weights)
+                        fig.set_figheight(8) 
+                        main.set_ylabel("Average attention weight in all blocks")
 
-                        fig.suptitle('Mean attention weight')
-                        ax.set_title(f"'{selected_token}' was selected as the next token, from a probability of {token_prob*100:0.2f}%")
+
+                        def update_bar_chart(data):
+                            main.clear()
+                            main.bar(whole_prev_completion, get_block_attention_weights())
+                       
+                        def update_labels():
+                            fig.suptitle('Attention weights')
+                            main.set_title(f"'{selected_token}' was selected as the next token, from a probability of {token_prob*100:0.2f}%")
+
+                            if block_mode == "Mean":
+                                if head_mode == "Mean":
+                                    main.set_ylabel("Average head attention weight across all blocks")
+                                else:
+                                    main.set_ylabel(f"Head {head_n} attention weight across all blocks")
+                            else:
+                                block_name = "final block" if block_n == n_blocks - 1 else f"block {block_n}"
+                                if head_mode == "Mean":
+                                    main.set_ylabel(f"Average head attention weight in {block_name}")
+                                else:
+                                    main.set_ylabel(f"Head {head_n} attention weight in {block_name}")
+
+                        block_radio = RadioButtons(ax['block_radio'], ('Mean', 'Individual'))
+                        def block_radio_fn(label):
+                            block_mode = label
+                            update_bar_chart(get_block_attention_weights())
+                            update_labels()
+                            fig.canvas.draw()
+                        block_radio.on_clicked(block_radio_fn)
+
+                        head_radio = RadioButtons(ax['head_radio'], ('Mean', 'Individual'))
+                        def head_radio_fn(label):
+                            head_mode = label
+                            update_bar_chart(get_block_attention_weights())
+                            update_labels()
+                            fig.canvas.draw()
+                        head_radio.on_clicked(head_radio_fn)
+
 
                         # Add button to close and continue
                         button_axis = fig.add_axes([0.7, 0.8, 0.2, 0.075])
@@ -152,6 +228,11 @@ with torch.no_grad():
                         def clicked_callback(_event):
                             plt.close(fig)
                         next_button.on_clicked(clicked_callback)
+
+
+                        # Actual plot 
+                        update_bar_chart(get_block_attention_weights())
+                        update_labels()
 
                         # Show plot, which pauses execution until it's closed
                         plt.show()
