@@ -9,13 +9,9 @@ from contextlib import nullcontext
 import torch
 import tiktoken
 from model import GPTConfig, GPT
-import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
 import numpy as np
-
-# Apply seaborn default theme
-sns.set_theme()
 
 # -----------------------------------------------------------------------------
 init_from = 'resume' # either 'resume' (from an out_dir) or a gpt2 variant (e.g. 'gpt2-xl')
