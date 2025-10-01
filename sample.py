@@ -127,10 +127,12 @@ with torch.no_grad():
                         # print("BLocks",n_blocks,"Heads",n_heads)
 
                         # Changed in the chart
-                        block_mode = "Mean"
-                        head_mode = "Mean"
-                        block_n = n_blocks - 1
-                        head_n = n_heads - 1
+                        chart_state = {
+                            "block_mode": "Mean",
+                            "head_mode": "Mean",
+                            "block_n": n_blocks - 1,
+                            "head_n": n_heads - 1
+                        }
 
                         def get_head_attention_weights(block_i, head=None):
                             block = model.last_token_attention_weights[block_i]
@@ -152,16 +154,16 @@ with torch.no_grad():
                         def get_block_attention_weights(block=None, head=None):
                             # Update vars, whilst keeping it usable as an indepent func
                             if block is None:
-                                if block_mode == "Mean":
+                                if chart_state["block_mode"] == "Mean":
                                     pass
                                 else:
-                                    block = block_n
+                                    block = chart_state["block_n"]
                             
                             if head is None:
-                                if head_mode == "Mean":
+                                if chart_state["head_mode"] == "Mean":
                                     pass
                                 else:
-                                    head = head_n
+                                    head = chart_state["head_n"]
                                 
                             if block is None:
                                 total_weights = [0 for _ in range(n_tokens)]
@@ -199,23 +201,23 @@ with torch.no_grad():
                             fig.suptitle('Attention weights')
                             main.set_title(f"'{selected_token}' was selected as the next token, from a probability of {token_prob*100:0.2f}%")
 
-                            if block_mode == "Mean":
-                                if head_mode == "Mean":
+                            if chart_state["block_mode"] == "Mean":
+                                if chart_state["head_mode"] == "Mean":
                                     main.set_ylabel("Average head attention weight across all blocks")
                                 else:
-                                    main.set_ylabel(f"Head {head_n} attention weight across all blocks")
+                                    main.set_ylabel(f"Head {chart_state["head_n"]} attention weight across all blocks")
                             else:
-                                block_name = "final block" if block_n == n_blocks - 1 else f"block {block_n}"
-                                if head_mode == "Mean":
+                                block_name = "final block" if chart_state["block_n"] == n_blocks - 1 else f"block {chart_state["block_n"]}"
+                                if chart_state["head_mode"] == "Mean":
                                     main.set_ylabel(f"Average head attention weight in {block_name}")
                                 else:
-                                    main.set_ylabel(f"Head {head_n} attention weight in {block_name}")
+                                    main.set_ylabel(f"Head {chart_state["head_n"]} attention weight in {block_name}")
 
                         # Radio buttons for average vs slider
                         ax['block_radio'].set_title("Block mode")
                         block_radio = RadioButtons(ax['block_radio'], ('Mean', 'Individual'))
                         def block_radio_fn(label):
-                            block_mode = label
+                            chart_state["block_mode"] = label
                             update_bar_chart(get_block_attention_weights())
                             update_labels()
                             fig.canvas.draw()
@@ -224,17 +226,17 @@ with torch.no_grad():
                         ax['head_radio'].set_title("Head mode")
                         head_radio = RadioButtons(ax['head_radio'], ('Mean', 'Individual'))
                         def head_radio_fn(label):
-                            head_mode = label
+                            chart_state["head_mode"] = label
                             update_bar_chart(get_block_attention_weights())
                             update_labels()
-                            fig.canvas.draw()
+                            fig.canvas.draw_idle()
                         head_radio.on_clicked(head_radio_fn)
 
                         # Sliders for selecting head or block
                         head_slider = Slider(
                             ax["head_slider"],
                             label="Head to show weights for",
-                            valinit=head_n,
+                            valinit=chart_state["head_n"],
                             valstep=[i for i in range(n_heads)],
                             valmin=0,
                             valmax=n_heads-1
@@ -242,14 +244,14 @@ with torch.no_grad():
                         block_slider = Slider(
                             ax["block_slider"],
                             label="Block to show weights for",
-                            valinit=block_n,
+                            valinit=chart_state["block_n"],
                             valstep=[i for i in range(n_blocks)],
                             valmin=0,
                             valmax=n_blocks-1
                         )
                         def on_slider_change(val):
-                            block_n = block_slider.val
-                            head_n = head_slider.val
+                            chart_state["block_n"] = block_slider.val
+                            chart_state["head_n"] = head_slider.val
                             update_bar_chart(get_block_attention_weights())
                             update_labels()
                             fig.canvas.draw()
