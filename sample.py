@@ -128,7 +128,7 @@ with torch.no_grad():
 
                         # Changed in the chart
                         chart_state = {
-                            "block_mode": "Mean",
+                            "block_mode": "Individual",
                             "head_mode": "Mean",
                             "block_n": n_blocks - 1,
                             "head_n": n_heads - 1
