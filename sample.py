@@ -121,7 +121,7 @@ with torch.no_grad():
                     whole_prev_completion = [decode([t]) for t in all_prev_tokens[0].tolist()]
                     n_tokens = len(whole_prev_completion)
                     if show_attention:
-                        print(model.last_token_attention_weights[-1].shape)
+                        # print(model.last_token_attention_weights[-1].shape)
                         n_blocks = len(model.last_token_attention_weights)
                         n_heads = len(model.last_token_attention_weights[0][0, :, -1, :])
                         # print("BLocks",n_blocks,"Heads",n_heads)
